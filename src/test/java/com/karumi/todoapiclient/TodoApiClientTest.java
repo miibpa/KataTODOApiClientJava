@@ -17,14 +17,20 @@ package com.karumi.todoapiclient;
 
 import com.karumi.todoapiclient.dto.TaskDto;
 import java.util.List;
+
+import com.karumi.todoapiclient.exception.ItemNotFoundException;
+import com.karumi.todoapiclient.exception.UnknownErrorException;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.mockito.Mockito.mock;
 
 public class TodoApiClientTest extends MockWebServerTest {
 
+  private static final String ANY_ID = "any";
+  private static final TaskDto ANY_TASK = mock(TaskDto.class);
   private TodoApiClient apiClient;
 
   @Before public void setUp() throws Exception {
@@ -58,6 +64,68 @@ public class TodoApiClientTest extends MockWebServerTest {
     assertTaskContainsExpectedValues(tasks.get(0));
   }
 
+  @Test(expected = UnknownErrorException.class) 
+  public void shouldReturnAnExceptionWhenGetAllReceivedAnServerError() throws Exception{
+    enqueueMockResponse(414);
+    apiClient.getAllTasks();
+  }
+  
+  @Test(expected = ItemNotFoundException.class)
+  public void shouldReturnItemNotFoundExceptionWhenReceive404errorCode() throws Exception{
+    enqueueMockResponse(404);
+
+    apiClient.getTaskById(ANY_ID);
+  }
+
+  @Test public void shouldReturnAValidTaskForGivenId() throws Exception{
+    enqueueMockResponse(200,"getTaskByIdResponse.json");
+
+    TaskDto task = apiClient.getTaskById("1");
+
+    assertTaskContainsExpectedValues(task);
+
+  }
+
+  @Test public void shouldSendAValidIdInTheUrl() throws Exception{
+    enqueueMockResponse();
+
+    apiClient.getTaskById(ANY_ID);
+
+    assertGetRequestSentTo("/todos/" + ANY_ID);
+
+  }
+
+  @Test public void postNewTodoResponseIsCorrect() throws Exception{
+    enqueueMockResponse(200,"addTaskResponse.json");
+
+    TaskDto task = apiClient.addTask(ANY_TASK);
+
+    assertTaskContainsExpectedValues(task);
+
+  }
+
+  @Test public void postNewTodoBodyAndIsCorrect() throws Exception{
+    enqueueMockResponse(200,"addTaskResponse.json");
+    TaskDto newTask = new TaskDto("1","2","Finish this kata",false);
+
+    TaskDto taskDto = apiClient.addTask(newTask);
+
+    assertTaskContainsExpectedValues(taskDto);
+    assertRequestBodyEquals("addTaskRequest.json");
+  }
+
+  @Test public void posNewTodoIsSentToValidUrl() throws Exception{
+    enqueueMockResponse();
+
+    apiClient.addTask(ANY_TASK);
+
+    assertPostRequestSentTo("/todos");
+
+  }
+
+
+
+  
   private void assertTaskContainsExpectedValues(TaskDto task) {
     assertEquals(task.getId(), "1");
     assertEquals(task.getUserId(), "1");
